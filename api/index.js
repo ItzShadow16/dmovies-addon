@@ -3,16 +3,16 @@ const fs      = require('fs');
 const path    = require('path');
 const axios   = require('axios');
 const cheerio = require('cheerio');
-const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 
 ////////////////////////////////////////////////////////////////////////////////
 // 1) Load your DesireMovies index.json
 ////////////////////////////////////////////////////////////////////////////////
-const INDEX_PATH = path.resolve(__dirname, '../myIndex.json');
-const INDEX      = JSON.parse(fs.readFileSync(INDEX_PATH, 'utf8'));
+const INDEX = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, '../myIndex.json'), 'utf8')
+);
 
 ////////////////////////////////////////////////////////////////////////////////
-// 2) Manifest – only `stream`
+// 2) Your add-on manifest
 ////////////////////////////////////////////////////////////////////////////////
 const manifest = {
   id:         'org.desiremovies.multistream',
@@ -25,10 +25,8 @@ const manifest = {
   catalogs:   []
 };
 
-const builder = new addonBuilder(manifest);
-
 ////////////////////////////////////////////////////////////////////////////////
-// 3) Helpers
+// 3) Helper functions
 ////////////////////////////////////////////////////////////////////////////////
 function normalize(s) {
   return s
@@ -59,39 +57,43 @@ function scoreTitle(title) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// 4) resolveFinalUrl: multi-step gyanigurus→HubCloud→.mkv
+// 4) Full resolveFinalUrl implementation
 ////////////////////////////////////////////////////////////////////////////////
 async function resolveFinalUrl(gdLink) {
+  // Step 1: Fetch the initial page
   let html = (await axios.get(gdLink)).data;
   let $    = cheerio.load(html);
 
-  // find the form or a direct “download” link
-  const form = $('form').first();
-  let openUrl = form.length
+  // Try to find a form action or a direct "download" link
+  const form    = $('form').first();
+  let openUrl   = form.length
     ? form.attr('action')
     : $('a').filter((i,a) => /link|download/i.test($(a).text())).attr('href');
   openUrl = openUrl.startsWith('http')
     ? openUrl
     : new URL(openUrl, gdLink).href;
 
+  // Step 2: Follow to the next page (gyanigurus → HubCloud)
   html = (await axios.get(openUrl)).data;
   $    = cheerio.load(html);
 
-  // HubCloud link
+  // Find the HubCloud link
   const hubLink = $('a').map((i,a) => $(a).attr('href')).get()
     .find(u => u && u.includes('hubcloud'));
   if (!hubLink) throw new Error('HubCloud link not found');
 
+  // GET the HubCloud page
   html = (await axios.get(hubLink)).data;
   let $hc = cheerio.load(html);
 
-  // “Generate direct download link” form
+  // Step 3: Look for a "Generate direct download link" form
   const genForm = $hc('form').filter((i,el) => {
     return $hc(el).find('input[type="submit"]').filter((j,btn) =>
       /generate direct download link/i.test($hc(btn).attr('value')||'')
     ).length > 0;
   }).first();
 
+  // If that form exists, submit it
   if (genForm.length) {
     const action   = genForm.attr('action');
     const formData = new URLSearchParams();
@@ -105,10 +107,10 @@ async function resolveFinalUrl(gdLink) {
     html = (await axios.post(action, formData.toString(), {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     })).data;
-    $hc  = cheerio.load(html);
+    $hc = cheerio.load(html);
   }
 
-  // “Download” trigger link
+  // Step 4: Find the actual download trigger
   let trigger = $hc('a').map((i,a) => $hc(a).attr('href')).get()
     .find(u =>
       u &&
@@ -123,7 +125,7 @@ async function resolveFinalUrl(gdLink) {
     $hc     = cheerio.load(html);
   }
 
-  // final .mkv/.mp4/.webm
+  // Step 5: Finally pick the .mkv/.mp4/.webm link
   let finalUrl = $hc('a').map((i,a) => $hc(a).attr('href')).get()
     .find(u => /\.(mkv|mp4|webm)(\?.*)?$/i.test(u));
   if (!finalUrl) {
@@ -137,60 +139,50 @@ async function resolveFinalUrl(gdLink) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// 5) Stream handler: scrape IMDb, match & prioritize
+// 5) Stream‐handler logic
 ////////////////////////////////////////////////////////////////////////////////
-builder.defineStreamHandler(async ({ type, id }) => {
-  if (type !== 'movie') return { streams: [] };
-
-  // IMDb scrape
+async function handleStream(id) {
+  // 5.1 Scrape IMDb for title & year
   let scrapedTitle = '', scrapedYear = '';
   if (/^tt\d+$/.test(id)) {
     try {
-      const imdbUrl = `https://www.imdb.com/title/${id}/`;
-      const html = (await axios.get(imdbUrl, {
+      const res  = await axios.get(`https://www.imdb.com/title/${id}/`, {
         headers: {
           'User-Agent':      'Mozilla/5.0',
-          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Language': 'en-US,en;q=0.9'
         }
-      })).data;
-      const $   = cheerio.load(html);
-      const raw = $('meta[property="og:title"]').attr('content') || $('title').text();
-      const m   = raw.match(/^(.+?)\s*\((\d{4})\)/);
-      if (m) { scrapedTitle = m[1].trim(); scrapedYear = m[2]; }
-    } catch (err) {
-      console.warn(`IMDb scrape failed: ${err.message}`);
-      return { streams: [] };
+      });
+      const $    = cheerio.load(res.data);
+      const raw  = $('meta[property="og:title"]').attr('content') || $('title').text();
+      const match= raw.match(/^(.+?)\s*\((\d{4})\)/);
+      if (match) {
+        scrapedTitle = match[1].trim();
+        scrapedYear  = match[2];
+      }
     }
+    catch (_) { return { streams: [] }; }
   }
-  if (!scrapedTitle || !scrapedYear) {
-    console.warn(`Could not extract title/year for ${id}`);
-    return { streams: [] };
-  }
+  if (!scrapedTitle || !scrapedYear) { return { streams: [] }; }
 
-  // match in INDEX
-  const base = scrapedTitle.split(':')[0].trim();
-  const year = scrapedYear;
+  // 5.2 Find matching entries in INDEX
+  const base       = scrapedTitle.split(':')[0].trim();
+  const year       = scrapedYear;
   const candidates = INDEX.filter(item => {
     if (containsBannedWords(item.title)) return false;
     const norm = normalize(item.title);
     return norm.includes(normalize(base)) && norm.includes(year);
   });
-  if (!candidates.length) {
-    console.warn(`No match for "${base} (${year})"`);
-    return { streams: [] };
-  }
+  if (!candidates.length) { return { streams: [] }; }
 
-  // pick best
+  // 5.3 Choose the best‐scoring entry
   const prefix = normalize(`${base} ${year}`);
   const exact  = candidates.filter(item =>
     normalize(item.title).startsWith(prefix)
   );
   const pool   = exact.length ? exact : candidates;
-  const entry  = pool.sort((a,b) =>
-    scoreTitle(b.title) - scoreTitle(a.title)
-  )[0];
+  const entry  = pool.sort((a,b) => scoreTitle(b.title) - scoreTitle(a.title))[0];
 
-  // scrape quality blocks
+  // 5.4 Scrape available qualities from the detail page
   const detailHtml = (await axios.get(entry.link)).data;
   const $d         = cheerio.load(detailHtml);
   const qualities  = [];
@@ -206,7 +198,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
     if (gdLink) qualities.push({ label, link: gdLink });
   });
 
-  // resolve streams
+  // 5.5 Resolve each to a streaming URL
   const streams = await Promise.all(qualities.map(async q => {
     const quality = (q.label.match(/(\d{3,4}p|4k)/i)||[])[0].toUpperCase() || 'SD';
     const size    = (q.label.match(/[\d.]+\s*(GB|MB)/i)||[])[0] || '';
@@ -222,36 +214,58 @@ builder.defineStreamHandler(async ({ type, id }) => {
         streaming: 'progressive'
       };
     }
-    catch (err) {
+    catch (_) {
       return {
-        title:     `DesireMovies – ${quality} [${size}] Not Available`,
-        url:       null,
+        title:   `DesireMovies – ${quality} [${size}] Not Available`,
+        url:     null,
         quality,
         size,
-        release:   `${q.label} Not Available`
+        release: `${q.label} Not Available`
       };
     }
   }));
 
   return { streams };
-});
+}
 
 ////////////////////////////////////////////////////////////////////////////////
-// 6) Export handler for Serverless
+// 6) Vercel entrypoint
 ////////////////////////////////////////////////////////////////////////////////
-// get the raw handler function from the addon SDK
-// create the actual HTTP handler from the Stremio SDK
-const stremioHandler = serveHTTP(builder.getInterface());
-
 module.exports = async (req, res) => {
-  console.log('→ Incoming URL:', req.url);
   try {
-    // invoke the real handler
-    await stremioHandler(req, res);
+    // Log every request
+    console.log('→ Request:', req.url);
+
+    // Parse URL
+    const urlObj = new URL(req.url, `https://${req.headers.host}`);
+    const pathname = urlObj.pathname;
+    const search   = urlObj.searchParams;
+
+    // Serve manifest.json
+    if (pathname === '/manifest.json') {
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify(manifest));
+    }
+
+    // Handle stream queries
+    if (pathname === '/stream') {
+      const id = search.get('id');
+      if (!id) {
+        res.statusCode = 400;
+        return res.end('Error: missing id parameter');
+      }
+      const result = await handleStream(id);
+      res.setHeader('Content-Type', 'application/json');
+      return res.end(JSON.stringify(result));
+    }
+
+    // Anything else → 404
+    res.statusCode = 404;
+    return res.end('Not found');
   }
   catch (err) {
-    console.error('‼️ Handler error:', err);
+    console.error('‼️ Uncaught error:', err);
     res.statusCode = 500;
-    res.end('Internal Server Error');
+    return res.end('Internal Server Error');
   }
 };
