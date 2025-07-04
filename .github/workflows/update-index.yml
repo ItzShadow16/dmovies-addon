@@ -27,7 +27,7 @@ jobs:
         run: npm install axios cheerio
 
       - name: Run index updater
-        run: node updateIndex.js
+        run: node updatemyIndex.js
 
       - name: "Debug: git status"
         run: git status
