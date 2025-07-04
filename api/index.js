@@ -21,7 +21,7 @@ const manifest = {
   description:'IMDb scrape, "&"→"and", captures 4K/2160p, quality scoring, skips non-GD links',
   resources:  ['stream'],
   types:      ['movie'],
-  idPrefixes: [''],
+  idPrefixes: ['tt'],
   catalogs:   []
 };
 
