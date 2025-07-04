@@ -17,6 +17,7 @@ const INDEX = JSON.parse(
 const manifest = {
   id:         'org.desiremovies.multistream',
   version:    '1.0.12',
+  version:    '1.0.13',
   name:       'DesireMovies Multi-Quality',
   description:'IMDb scrape, "&"→"and", captures 4K/2160p, quality scoring, skips non-GD links',
   resources:  ['stream'],
