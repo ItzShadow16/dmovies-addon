@@ -29,11 +29,10 @@ jobs:
       - name: Run index updater
         run: node updateIndex.js
 
-      # break debug into two simple steps to avoid pipe
-      - name: Debug: git status
+      - name: "Debug: git status"
         run: git status
 
-      - name: Debug: git diff
+      - name: "Debug: git diff"
         run: git diff
 
       - name: Commit and push if changed
