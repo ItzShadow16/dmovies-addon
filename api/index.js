@@ -3,7 +3,7 @@ const fs      = require('fs');
 const path    = require('path');
 const axios   = require('axios');
 const cheerio = require('cheerio');
-const { addonBuilder } = require('stremio-addon-sdk');
+const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 
 ////////////////////////////////////////////////////////////////////////////////
 // 1) Load your DesireMovies index.json
@@ -240,18 +240,18 @@ builder.defineStreamHandler(async ({ type, id }) => {
 // 6) Export handler for Serverless
 ////////////////////////////////////////////////////////////////////////////////
 // get the raw handler function from the addon SDK
-const handler = builder.getInterface();
+// create the actual HTTP handler from the Stremio SDK
+const stremioHandler = serveHTTP(builder.getInterface());
 
-// wrap it so we can log requests and catch errors
 module.exports = async (req, res) => {
   console.log('→ Incoming URL:', req.url);
   try {
-    // invoke the Stremio handler
-    await handler(req, res);
+    // invoke the real handler
+    await stremioHandler(req, res);
   }
   catch (err) {
     console.error('‼️ Handler error:', err);
     res.statusCode = 500;
-    return res.end('Internal Server Error');
+    res.end('Internal Server Error');
   }
 };
