@@ -27,7 +27,7 @@ jobs:
         run: npm install axios cheerio
 
       - name: Run index updater
-        run: node updatemyIndex.js
+        run: node updateIndex.js
 
       - name: "Debug: git status"
         run: git status
@@ -40,7 +40,11 @@ jobs:
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git add myIndex.json
-          git diff --quiet || git commit -m "chore: auto-update myIndex.json"
-          git push
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: auto-update myIndex.json"
+            git push
+          else
+            echo "No changes to commit"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
