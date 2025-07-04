@@ -231,25 +231,39 @@ async function handleStream(id) {
 ////////////////////////////////////////////////////////////////////////////////
 // 6) Vercel entrypoint
 ////////////////////////////////////////////////////////////////////////////////
+// at the top of your file, keep all your existing imports, helpers, manifest, etc.
+
+////////////////////////////////////////////////////////////////////////////////
+// Vercel entrypoint with CORS
+////////////////////////////////////////////////////////////////////////////////
 module.exports = async (req, res) => {
+  // 1) Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // 2) Reply to preflight and return
+  if (req.method === 'OPTIONS') {
+    res.statusCode = 204;
+    return res.end();
+  }
+
+  // 3) Your existing logic follows
   try {
-    // Log every request
-    console.log('→ Request:', req.url);
+    // Log requests if you want
+    console.log('→ Request URL:', req.url);
 
-    // Parse URL
-    const urlObj = new URL(req.url, `https://${req.headers.host}`);
+    const urlObj   = new URL(req.url, `https://${req.headers.host}`);
     const pathname = urlObj.pathname;
-    const search   = urlObj.searchParams;
+    const params   = urlObj.searchParams;
 
-    // Serve manifest.json
     if (pathname === '/manifest.json') {
       res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify(manifest));
     }
 
-    // Handle stream queries
     if (pathname === '/stream') {
-      const id = search.get('id');
+      const id = params.get('id');
       if (!id) {
         res.statusCode = 400;
         return res.end('Error: missing id parameter');
@@ -259,12 +273,12 @@ module.exports = async (req, res) => {
       return res.end(JSON.stringify(result));
     }
 
-    // Anything else → 404
+    // fallback
     res.statusCode = 404;
     return res.end('Not found');
   }
   catch (err) {
-    console.error('‼️ Uncaught error:', err);
+    console.error('Uncaught error:', err);
     res.statusCode = 500;
     return res.end('Internal Server Error');
   }
