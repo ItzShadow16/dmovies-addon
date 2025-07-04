@@ -1,0 +1,35 @@
+name: nightly-index-update
+
+on:
+  schedule:
+    - cron: '0 2 * * *'    # every day at 02:00 UTC
+  workflow_dispatch:      # also allows manual runs
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install axios cheerio
+
+      - name: Run index updater
+        run: node updatemyIndex.js
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add myIndex.json
+          git diff --quiet || git commit -m "chore: auto-update myIndex.json"
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
