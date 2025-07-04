@@ -29,6 +29,11 @@ jobs:
       - name: Run index updater
         run: node updatemyIndex.js
 
+      - name: Debug: show changed files
+        run: |
+          git status
+          git diff 
+
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions"
