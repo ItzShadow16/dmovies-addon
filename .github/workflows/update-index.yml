@@ -1,9 +1,12 @@
 name: nightly-index-update
 
+permissions:
+  contents: write
+
 on:
   schedule:
-    - cron: '0 2 * * *'    # every day at 02:00 UTC
-  workflow_dispatch:      # also allows manual runs
+    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   update:
@@ -12,6 +15,8 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v3
+        with:
+          persist-credentials: true
 
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -22,7 +27,12 @@ jobs:
         run: npm install axios cheerio
 
       - name: Run index updater
-        run: node updatemyIndex.js
+        run: node updateIndex.js
+
+      - name: Debug: show changed files
+        run: |
+          git status
+          git diff
 
       - name: Commit and push if changed
         run: |
