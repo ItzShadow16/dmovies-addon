@@ -3,7 +3,7 @@ const fs      = require('fs');
 const path    = require('path');
 const axios   = require('axios');
 const cheerio = require('cheerio');
-const { addonBuilder } = require('stremio-addon-sdk');
+const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 
 ////////////////////////////////////////////////////////////////////////////////
 // 1) Load your DesireMovies index.json
@@ -239,7 +239,5 @@ builder.defineStreamHandler(async ({ type, id }) => {
 ////////////////////////////////////////////////////////////////////////////////
 // 6) Export handler for Serverless
 ////////////////////////////////////////////////////////////////////////////////
-module.exports = (req, res) => {
-  // every request is forwarded to the Stremio addon interface
-  builder.getInterface()(req, res);
-};
+module.exports = serveHTTP(builder.getInterface());
+
