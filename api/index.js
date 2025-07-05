@@ -266,6 +266,22 @@ module.exports = async (req, res) => {
       return res.end(JSON.stringify(manifest));
     }
 
+    // Stremio stream route: /stream/movie/<id>.json
+   if (
+     pathname.startsWith('/stream/movie/') &&
+     pathname.endsWith('.json')
+   ) {
+     // Extract the IMDb id from the path
+     const parts = pathname.split('/');
+     const file  = parts[parts.length - 1];            // e.g. "tt20969586.json"
+     const id    = file.slice(0, -'.json'.length);     // "tt20969586"
+
+    console.log('→ Handling Stremio stream for ID:', id);
+    const result = await handleStream(id);
+    res.setHeader('Content-Type', 'application/json');
+    return res.end(JSON.stringify(result));
+   }
+
     if (pathname === '/stream') {
       const id = params.get('id');
       if (!id) {
