@@ -7,9 +7,23 @@ const cheerio = require('cheerio');
 ////////////////////////////////////////////////////////////////////////////////
 // 1) Load your DesireMovies index.json
 ////////////////////////////////////////////////////////////////////////////////
-const INDEX = JSON.parse(
-  fs.readFileSync(path.resolve(__dirname, '../myIndex.json'), 'utf8')
-);
+import axios from 'axios';
+
+let INDEX = null;
+
+async function loadIndex() {
+  if (!INDEX) {
+    const res = await axios.get(
+      'https://itzshadow16.github.io/dmovies-addon/myIndex.json'
+    );
+    INDEX = res.data;
+  }
+}
+
+module.exports = async (req, res) => {
+  await loadIndex();
+  // …the rest of your logic reading from INDEX…
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // 2) Your add-on manifest
