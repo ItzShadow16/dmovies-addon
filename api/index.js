@@ -261,7 +261,7 @@ module.exports = async (req, res) => {
     const pathname = urlObj.pathname;
     const params   = urlObj.searchParams;
 
-    if (pathname === '/manifest.json') {
+    if (pathname === '/' || pathname === '/manifest.json') {
       res.setHeader('Content-Type', 'application/json');
       return res.end(JSON.stringify(manifest));
     }
