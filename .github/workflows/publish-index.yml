@@ -1,6 +1,6 @@
 name: nightly-index-publish
 
-# Triggering GitHub to recognize this workflow
+# Triggering GitHub to recognize this workflow2
 
 on:
   schedule:
