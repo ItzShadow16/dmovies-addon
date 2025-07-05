@@ -1,15 +1,13 @@
 name: nightly-index-publish
 
-# Give the GITHUB_TOKEN push rights so the workflow can commit back to gh-pages
 permissions:
   contents: write
 
-# Triggering GitHub to recognize this workflow
 on:
   schedule:
-    - cron: '0 19 * * *'     # 12:30 AM IST
-    - cron: '30 7 * * *'     # 1:00 PM IST
-    - cron: '30 13 * * *'    # 7:00 PM IST
+    - cron: '0 19 * * *'   # 12:30 AM IST
+    - cron: '30 7 * * *'   # 1:00 PM IST
+    - cron: '30 13 * * *'  # 7:00 PM IST
   workflow_dispatch:
 
 jobs:
@@ -17,30 +15,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout gh-pages branch
+      - name: "Checkout gh-pages branch"
         uses: actions/checkout@v3
         with:
           ref: gh-pages
           persist-credentials: true
 
-      - name: Setup Node.js
+      - name: "Setup Node.js"
         uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install dependencies
+      - name: "Install dependencies"
         run: npm install axios cheerio
 
-      - name: Run index updater
+      - name: "Run index updater"
         run: node updatemyIndex.js
 
-      - name: Debug: git status
+      - name: "Debug: git status"
         run: git status
 
-      - name: Debug: git diff
+      - name: "Debug: git diff"
         run: git diff
 
-      - name: Commit & push if changed
+      - name: "Commit & push if changed"
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
