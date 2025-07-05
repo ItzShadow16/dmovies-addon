@@ -1,5 +1,7 @@
 name: nightly-index-publish
 
+# Triggering GitHub to recognize this workflow
+
 on:
   schedule:
     - cron: '0 19 * * *'     # 12:30 AM IST
