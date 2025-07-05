@@ -20,7 +20,12 @@ async function loadIndex() {
 
 module.exports = async (req, res) => {
   await loadIndex();
-  // …the rest of your logic reading from INDEX…
+
+  // Guard: if INDEX isn’t an array, replace it with an empty one
+if (!Array.isArray(INDEX)) {
+  console.warn('INDEX failed to load, defaulting to empty array');
+  INDEX = [];
+}
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -177,15 +182,21 @@ async function handleStream(id) {
   }
   if (!scrapedTitle || !scrapedYear) { return { streams: [] }; }
 
-  // 5.2 Find matching entries in INDEX
-  const base       = scrapedTitle.split(':')[0].trim();
-  const year       = scrapedYear;
-  const candidates = INDEX.filter(item => {
-    if (containsBannedWords(item.title)) return false;
-    const norm = normalize(item.title);
-    return norm.includes(normalize(base)) && norm.includes(year);
-  });
-  if (!candidates.length) { return { streams: [] }; }
+ // 5.2 Find matching entries in INDEX
+const base = scrapedTitle.split(':')[0].trim();
+const year = scrapedYear;
+
+// Safe‐guard INDEX so .filter() never runs on null or undefined
+const candidates = INDEX?.filter(item => {
+  if (containsBannedWords(item.title)) return false;
+  const norm = normalize(item.title);
+  return norm.includes(normalize(base)) && norm.includes(year);
+}) || [];
+
+// If no matches, return empty streams
+if (!candidates.length) {
+  return { streams: [] };
+}
 
   // 5.3 Choose the best‐scoring entry
   const prefix = normalize(`${base} ${year}`);
