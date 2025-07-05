@@ -1,33 +1,27 @@
-name: nightly-index-update
-
-permissions:
-  contents: write
+name: nightly-index-publish
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 19 * * *'     # 12:30 AM IST
+    - cron: '30 7 * * *'     # 1:00 PM IST
+    - cron: '30 13 * * *'    # 7:00 PM IST
   workflow_dispatch:
 
 jobs:
-  update:
+  update-index:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
         with:
+          ref: gh-pages
           persist-credentials: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - uses: actions/setup-node@v3
         with:
           node-version: '18'
 
-      - name: Install dependencies
-        run: npm install axios cheerio
-
-      - name: Run index updater
-        run: node updatemyIndex.js
+      - run: npm install axios cheerio
+      - run: node updatemyIndex.js              # writes docs/myIndex.json
 
       - name: "Debug: git status"
         run: git status
@@ -35,16 +29,13 @@ jobs:
       - name: "Debug: git diff"
         run: git diff
 
-      - name: Commit and push if changed
-        run: |
+      - run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add myIndex.json
+          git add docs/myIndex.json
           if ! git diff --cached --quiet; then
-            git commit -m "chore: auto-update myIndex.json"
-            git push
-          else
-            echo "No changes to commit"
+            git commit -m "chore: update index via Action"
+            git push origin gh-pages
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
