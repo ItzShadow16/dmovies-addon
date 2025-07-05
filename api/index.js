@@ -249,6 +249,9 @@ module.exports = async (req, res) => {
     return res.end();
   }
 
+/ 3) Log every incoming request for Stremio-debugging
+  console.log('🔥 STREMIO REQUEST:', req.method, req.url);
+
   // 3) Your existing logic follows
   try {
     // Log requests if you want
